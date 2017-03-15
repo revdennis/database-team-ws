@@ -43,7 +43,8 @@ dest_time = time.strptime(dest_time, '%Y-%m-%d %H:%M:%S')
 # Build the destination directory
 dest_data_directory = command_line_args.destination or raw_input('Destination data directory: ')
 os.makedirs(dest_data_directory)
-os.system("chmod 700 %s" % dest_data_directory)
+#os.system("chmod 700 %s" % dest_data_directory)
+os.chmod(dest_data_directory,0700)
 
 # Copy the source directory
 if subprocess.call('cp -a %(source)s/* %(dest)s/' % {'source': source_data_directory, 'dest': dest_data_directory}, shell=True) != 0:
@@ -78,20 +79,24 @@ template = """
 recovery_target_action=shutdown
 """
 recovery_conf = open("%s/recovery.conf" % dest_data_directory, "w")
-recovery_conf.write(template.format(target_time=time.strftime('%Y-%m-%dT%H:%M:%SZ', dest_time), wal_archive=wal_archive))
+recovery_conf.write(template.format(recovery_target_time=time.strftime('%Y-%m-%dT%H:%M:%SZ', dest_time), wal_archive=wal_archive))
 recovery_conf.close()
 
 # start postgresql
-if subprocess.call("exit 1", shell=True) != 0:
+if subprocess.call("%s/pg_ctl start -w -D %s" % (bin_path, dest_data_directory) , shell=True) != 0:
     logging.fatal("Error running Postgres")
     sys.exit(1)
 
 # remove recovery.conf to restart Postgres
+if os.path.exists(filename):
+    os.remove(filename)
+else:
+    print("Sorry, I can not remove %s file." % filename)
 
 # start Postgres if selected
 if command_line_args.auto_start:
     try:
-        process = subprocess.Popen("exit 1", shell=True)
+        process = subprocess.Popen("%s/pg_ctl start -w -D %s" % (bin_path, dest_data_directory) , shell=True)
         process.wait()
     except:
         process.send_signal(signal.SIGTERM)
